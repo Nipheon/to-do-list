@@ -4,234 +4,230 @@
  */
 
 /* Some info
-Using newer versions of jQuery and jQuery UI in place of the links given in problem statement
-All data is stored in local storage
-User data is extracted from local storage and saved in variable todo.data
-Otherwise, comments are provided at appropriate places
-*/
+ Using newer versions of jQuery and jQuery UI in place of the links given in problem statement
+ All data is stored in local storage
+ User data is extracted from local storage and saved in variable data
+ Otherwise, comments are provided at appropriate places
+ */
 
-var todo = todo || {},
-    data = JSON.parse(localStorage.getItem("todoData"));
+var todo = todo || {};
 
-data = data || {};
+(function (todo, $) {
 
-(function(todo, data, $) {
+	var defaults = {
+			 todoTask: "todo-task",
+			 todoHeader: "task-header",
+			 todoDate: "task-date",
+			 todoDescription: "task-description",
+			 taskId: "task-",
+			 formId: "todo-form",
+			 dataAttribute: "data",
+			 deleteDiv: "delete-div"
+		 }, codes = {
+			 "1": "#pending",
+			 "2": "#inProgress",
+			 "3": "#completed"
+		 },
 
-    var defaults = {
-            todoTask: "todo-task",
-            todoHeader: "task-header",
-            todoDate: "task-date",
-            todoDescription: "task-description",
-            taskId: "task-",
-            formId: "todo-form",
-            dataAttribute: "data",
-            deleteDiv: "delete-div"
-        }, codes = {
-            "1" : "#pending",
-            "2" : "#inProgress",
-            "3" : "#completed"
-        };
+		 data = {},
+		 order = {};
 
-    todo.init = function (options) {
 
-        options = options || {};
-        options = $.extend({}, defaults, options);
+	todo.init = function (options) {
 
-        $.each(data, function (index, params) {
-            generateElement(params);
-        });
+		options = options || {};
+		options = $.extend({}, defaults, options);
 
-        /*generateElement({
-            id: "123",
-            code: "1",
-            title: "asd",
-            date: "22/12/2013",
-            description: "Blah Blah"
-        });*/
+		loadAllData();
 
-        /*removeElement({
-            id: "123",
-            code: "1",
-            title: "asd",
-            date: "22/12/2013",
-            description: "Blah Blah"
-        });*/
+		// go through list of items and create them
+		$.each(order, function (index, params) {
+			generateElement(data[params]);
+		});
 
-        // Adding drop function to each category of task
-        $.each(codes, function (index, value) {
-            $(value).droppable({
-                drop: function (event, ui) {
-                        var element = ui.helper,
-                            css_id = element.attr("id"),
-                            id = css_id.replace(options.taskId, ""),
-                            object = data[id];
+		// Adding codes to each category of tasks
+		$.each(codes, function (index, value) {
+			$(value).data("code", index);
+		});
 
-                            // Removing old element
-                            removeElement(object);
+		// Create Sortable List and connect them
+		$(".sortable").sortable(
+			 {
+				 start: function (e, ui) {
+					 // set placeholder to height of dragged element
+					 ui.placeholder.height(ui.item.height());
+				 },
 
-                            // Changing object code
-                            object.code = index;
+				 stop: function (event, ui) {
 
-                            // Generating new element
-                            generateElement(object);
+					 var element = ui.item,
+						  css_id = element.attr("id"),
+						  id = css_id.replace(options.taskId, ""),
+						  object = data[id];
 
-                            // Updating Local Storage
-                            data[id] = object;
-                            localStorage.setItem("todoData", JSON.stringify(data));
+					 // check if target is delete-box and remove element
+					 if (ui.item.parent().attr("id") === "delete-div") {
+						 ui.item.remove();
+						 removeElement(id);
+					 }
 
-                            // Hiding Delete Area
-                            $("#" + defaults.deleteDiv).hide();
-                    }
-            });
-        });
+					 else {
 
-        // Adding drop function to delete div
-        $("#" + options.deleteDiv).droppable({
-            drop: function(event, ui) {
-                var element = ui.helper,
-                    css_id = element.attr("id"),
-                    id = css_id.replace(options.taskId, ""),
-                    object = data[id];
+						 // Changing object code
+						 object.code = ui.item.parent().data("code");
+						 data[id] = object;
+					 }
 
-                // Removing old element
-                removeElement(object);
+					 saveData();
 
-                // Updating local storage
-                delete data[id];
-                localStorage.setItem("todoData", JSON.stringify(data));
+				 }}).sortable("option", {"connectWith": ".sortable", "opacity": 0.9}).disableSelection();
 
-                // Hiding Delete Area
-                $("#" + defaults.deleteDiv).hide();
-            }
-        })
+	};
 
-    };
+	// Add Task
+	var generateElement = function (params) {
+		var parent = $(codes[params.code]),
+			 wrapper;
 
-    // Add Task
-    var generateElement = function(params){
-        var parent = $(codes[params.code]),
-            wrapper;
+		if (!parent) {
+			return;
+		}
 
-        if (!parent) {
-            return;
-        }
+		wrapper = $("<li ></li>", {
+			"class": defaults.todoTask,
+			"id": defaults.taskId + params.id,
+			"data": params.id
+		}).appendTo(parent);
 
-        wrapper = $("<div />", {
-            "class" : defaults.todoTask,
-            "id" : defaults.taskId + params.id,
-            "data" : params.id
-        }).appendTo(parent);
+//        $("<span />", {
+//            "class" : "ui-icon ui-icon-circle-minus pull-right"
+//          }).appendTo(wrapper);
 
-        $("<div />", {
-            "class" : defaults.todoHeader,
-            "text": params.title
-        }).appendTo(wrapper);
+		$("<p ></p>", {
+			"class": defaults.todoDate,
+			"text": params.date
+		}).appendTo(wrapper);
 
-        $("<div />", {
-            "class" : defaults.todoDate,
-            "text": params.date
-        }).appendTo(wrapper);
+		$("<p ></p>", {
+			"class": defaults.todoHeader,
+			"text": params.title
+		}).appendTo(wrapper);
 
-        $("<div />", {
-            "class" : defaults.todoDescription,
-            "text": params.description
-        }).appendTo(wrapper);
 
-        //noinspection MagicNumberJS
-	    wrapper.draggable({
-            start: function() {
-                $("#" + defaults.deleteDiv).show();
-            },
-            stop: function() {
-                $("#" + defaults.deleteDiv).hide();
-            },
-	        revert: "invalid",
-	        revertDuration : 200
-        });
+		$("<p ></p>", {
+			"class": defaults.todoDescription,
+			"html": params.description.replace(new RegExp('\r?\n', 'g'), '<br />')
+		}).appendTo(wrapper);
 
-    };
+		saveData();
 
-    // Remove task
-    var removeElement = function (params) {
-        $("#" + defaults.taskId + params.id).remove();
-    };
+	};
 
-    todo.add = function() {
-        var inputs = $("#" + defaults.formId + " :input"),
-            errorMessage = "Title can not be empty",
-            id, title, description, date, tempData;
+	// Remove task
+	var removeElement = function (params) {
+		delete data[params];
+	};
 
-        if (inputs.length !== 4) {
-            return;
-        }
+	todo.add = function () {
+		var inputs = $("#" + defaults.formId + " :input"),
+			 errorMessage = "Title can not be empty",
+			 id, title, description, date, tempData;
 
-        title = inputs[0].value;
-        description = inputs[1].value;
-        date = inputs[2].value;
+		if (inputs.length !== 4) {
+			return;
+		}
 
-        if (!title) {
-            generateDialog(errorMessage);
-            return;
-        }
+		title = inputs[0].value;
+		description = inputs[1].value;
+		date = inputs[2].value;
 
-        id = new Date().getTime();
+		if (!title) {
+			generateDialog(errorMessage);
+			return;
+		}
 
-        tempData = {
-            id : id,
-            code: "1",
-            title: title,
-            date: date,
-            description: description
-        };
+		id = new Date().getTime();
 
-        // Saving element in local storage
-        data[id] = tempData;
-        localStorage.setItem("todoData", JSON.stringify(data));
+		//noinspection MagicNumberJS
+		tempData = {
+			id: id,
+			position: 999,
+			code: "1",
+			title: title,
+			date: date,
+			description: description
+		};
 
-        // Generate Todo Element
-        generateElement(tempData);
+		// Saving element in local storage
+		data[id] = tempData;
+		// Generate Todo Element
+		generateElement(tempData);
+		// Reset Form
+		inputs[0].value = "";
+		inputs[1].value = "";
+		inputs[2].value = "";
+	};
 
-        // Reset Form
-        inputs[0].value = "";
-        inputs[1].value = "";
-        inputs[2].value = "";
-    };
+	var generateDialog = function (message) {
+		var responseId = "response-dialog",
+			 title = "Message",
+			 responseDialog = $("#" + responseId),
+			 buttonOptions;
 
-    var generateDialog = function (message) {
-        var responseId = "response-dialog",
-            title = "Messaage",
-            responseDialog = $("#" + responseId),
-            buttonOptions;
+		if (!responseDialog.length) {
+			responseDialog = $("<div ></div>", {
+				title: title,
+				id: responseId
+			}).appendTo($("body"));
+		}
 
-        if (!responseDialog.length) {
-            responseDialog = $("<div />", {
-                    title: title,
-                    id: responseId
-            }).appendTo($("body"));
-        }
+		responseDialog.html(message);
 
-        responseDialog.html(message);
+		buttonOptions = {
+			"Ok": function () {
+				responseDialog.dialog("close");
+			}
+		};
 
-        buttonOptions = {
-            "Ok" : function () {
-                responseDialog.dialog("close");
-            }
-        };
+		//noinspection MagicNumberJS
+		responseDialog.dialog({
+			autoOpen: true,
+			width: 400,
+			modal: true,
+			closeOnEscape: true,
+			buttons: buttonOptions
+		});
+	};
 
-        //noinspection MagicNumberJS
-	    responseDialog.dialog({
-            autoOpen: true,
-            width: 400,
-            modal: true,
-            closeOnEscape: true,
-            buttons: buttonOptions
-        });
-    };
+	todo.clear = function () {
+		data = {};
+		order = {};
+		$("." + defaults.todoTask).remove();
+		saveData();
+	};
 
-    todo.clear = function () {
-        data = {};
-        localStorage.setItem("todoData", JSON.stringify(data));
-        $("." + defaults.todoTask).remove();
-    };
+	todo.debug = function () {
+	};
 
-})(todo, data, jQuery);
+	var loadAllData = function () {
+
+		data = JSON.parse(localStorage.getItem("todoData")) || {};
+		order = JSON.parse(localStorage.getItem("todoOrder")) || {};
+
+	};
+
+	var saveData = function () {
+
+		$(order).empty();
+		localStorage.setItem("todoData", JSON.stringify(data));
+		$('.todo-task').each(function (index) {
+			order[index] = $(this).attr("id").replace(defaults.taskId, "");
+
+		});
+		localStorage.setItem("todoOrder", JSON.stringify(order));
+		todo.debug();
+
+	};
+
+
+})(todo, jQuery);
